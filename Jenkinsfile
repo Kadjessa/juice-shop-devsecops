@@ -5,20 +5,33 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                echo 'Code récupéré depuis Git'
+                echo 'Code Juice Shop récupéré'
             }
         }
 
         stage('SAST') {
             steps {
-                echo 'Analyse SAST'
+                sh '''
+                    /opt/semgrep-venv/bin/semgrep scan \
+                    --config=auto \
+                    --json \
+                    --output=semgrep-report.json \
+                    .
+                '''
             }
         }
 
-        stage('Report') {
+        stage('Archive Report') {
             steps {
-                echo 'Génération du rapport'
+                archiveArtifacts artifacts: 'semgrep-report.json',
+                                 fingerprint: true
             }
+        }
+    }
+
+    post {
+        always {
+            echo 'Pipeline terminé'
         }
     }
 }
