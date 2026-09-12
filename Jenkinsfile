@@ -5,20 +5,63 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                echo 'Code récupéré depuis Git'
+                checkout scm
             }
         }
 
-        stage('SAST') {
+        stage('Build / Preparation') {
             steps {
-                echo 'Analyse SAST'
+                sh '''
+                    npm ci
+                '''
             }
         }
 
-        stage('Report') {
+        stage('Security Analysis - Semgrep') {
             steps {
-                echo 'Génération du rapport'
+                sh '''
+                    mkdir -p reports
+
+                    semgrep scan \
+                        --config p/javascript \
+                        --json \
+                        --output reports/semgrep.json \
+                        .
+                '''
             }
+        }
+
+        stage('Additional Security Check - Gitleaks') {
+            steps {
+                sh '''
+                    mkdir -p reports
+
+                    gitleaks detect \
+                        --source . \
+                        --report-format json \
+                        --report-path reports/gitleaks.json \
+                        --exit-code 0
+                '''
+            }
+        }
+
+        stage('Report Generation') {
+            steps {
+                archiveArtifacts artifacts: 'reports/*.json',
+                    allowEmptyArchive: true
+            }
+        }
+
+        stage('Notification') {
+            steps {
+                echo "Analyses de sécurité terminées."
+            }
+        }
+    }
+
+    post {
+        always {
+            echo "Pipeline terminé avec le statut : ${currentBuild.currentResult}"
         }
     }
 }
